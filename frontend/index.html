@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Handwritten Answer Evaluation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --primary: #6366f1;
+      --card: rgba(135, 88, 133, 0.88);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --glass-border: rgba(255, 255, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      background: linear-gradient(
+        60deg,
+        #020617,
+        #0f172a,
+        #1e1b4b,
+        #2e1065,
+        #3b0764,
+        #4c0519,
+        #020617
+      );
+      background-size: 600% 600%;
+      animation: gradientMove 14s ease infinite;
+      color: var(--text);
+    }
+
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 850px;
+      background: var(--card);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+      padding: 30px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.9);
+      border: 1px dashed #374151;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 14px;
+      cursor: pointer;
+      border: 1px solid var(--glass-border);
+      color: white;
+      background: linear-gradient(
+        135deg,
+        rgba(99,102,241,0.6),
+        rgba(79,70,229,0.3)
+      );
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .loader {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+      color: var(--muted);
+    }
+
+    .success {
+      margin-top: 20px;
+      text-align: center;
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .error {
+      color: var(--danger);
+      margin-top: 15px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>📝 Handwritten Answer Evaluation</h1>
+  <p class="subtitle">OCR + AI-based Evaluation System</p>
+
+  <form id="uploadForm">
+    <div class="form-group">
+      <label for="answerKey">📘 Answer Key (PDF)</label>
+      <input id="answerKey" type="file" name="answer_key" accept=".pdf" required>
+    </div>
+
+    <div class="form-group">
+      <label for="answerPaper">✍️ Answer Paper (PDF / Image)</label>
+      <input id="answerPaper" type="file" name="answer_paper" accept=".pdf,.png,.jpg,.jpeg" required>
+    </div>
+
+    <button type="button" id="submitBtn">🚀 Evaluate & Download Report</button>
+  </form>
+
+  <div class="loader" id="loader">⏳ Evaluating… Please wait</div>
+  <div class="success" id="success"></div>
+  <div class="error" id="error"></div>
+
+  <footer>
+    Built with FastAPI • OCR • LLaMA-3.1
+  </footer>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("uploadForm");
+  const loader = document.getElementById("loader");
+  const errorBox = document.getElementById("error");
+  const successBox = document.getElementById("success");
+  const submitBtn = document.getElementById("submitBtn");
+
+  submitBtn.addEventListener("click", async () => {
+    errorBox.textContent = "";
+    successBox.textContent = "";
+    loader.style.display = "block";
+    submitBtn.disabled = true;
+
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/evaluate", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("Evaluation failed");
+      }
+
+      const blob = await response.blob();
+      console.log("PDF blob size:", blob.size);
+
+      if (blob.size === 0) {
+        throw new Error("Received empty PDF");
+      }
+
+      // 🔥 Force download (reliable across browsers)
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "evaluation_report.pdf";
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      successBox.textContent = "✅ Evaluation complete. PDF downloaded successfully.";
+    } catch (err) {
+      errorBox.textContent = "❌ " + err.message;
+    } finally {
+      loader.style.display = "none";
+      submitBtn.disabled = false;
+    }
+  });
+});
+</script>
+
+</body>
+</html>
